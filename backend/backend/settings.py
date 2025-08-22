@@ -5,9 +5,12 @@ import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Configure decouple to use the correct .env file path
+# Configure decouple to handle missing .env file gracefully
 env_path = BASE_DIR / '.env'
-config = Config(RepositoryEnv(env_path))
+try:
+    config = Config(RepositoryEnv(env_path))
+except FileNotFoundError:
+    config = Config()  # Use environment variables
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY')
@@ -15,7 +18,7 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
 
 # Application definition
 INSTALLED_APPS = [
@@ -44,14 +47,27 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# CORS settings
+# CORS settings - Updated for Railway deployment
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
+# Add Railway domains if provided
+railway_domains = config('RAILWAY_DOMAINS', default='').split(',')
+for domain in railway_domains:
+    if domain.strip():
+        CORS_ALLOWED_ORIGINS.append(f"https://{domain.strip()}")
+        CORS_ALLOWED_ORIGINS.append(f"http://{domain.strip()}")
+
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
 ]
+# Add Railway domains to CSRF trusted origins
+for domain in railway_domains:
+    if domain.strip():
+        CSRF_TRUSTED_ORIGINS.append(f"https://{domain.strip()}")
+
 CORS_ALLOW_CREDENTIALS = True
 
 # CORS headers for JWT
@@ -88,17 +104,25 @@ TEMPLATES = [
 WSGI_APPLICATION = 'backend.wsgi.application'
 ASGI_APPLICATION = 'backend.asgi.application'
 
-# Database
-DATABASES = {
-    'default': {
-        'ENGINE': config('DB_ENGINE'),
-        'NAME': config('DB_NAME'),
-        'USER': config('DB_USER'),
-        'PASSWORD': config('DB_PASSWORD'),
-        'HOST': config('DB_HOST'),
-        'PORT': config('DB_PORT', default='5432'),
+# Database - Updated to handle Railway's DATABASE_URL
+if 'DATABASE_URL' in os.environ:
+    # Railway provides DATABASE_URL
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.parse(os.environ.get('DATABASE_URL'))
     }
-}
+else:
+    # Fallback to individual environment variables
+    DATABASES = {
+        'default': {
+            'ENGINE': config('DB_ENGINE'),
+            'NAME': config('DB_NAME'),
+            'USER': config('DB_USER'),
+            'PASSWORD': config('DB_PASSWORD'),
+            'HOST': config('DB_HOST'),
+            'PORT': config('DB_PORT', default='5432'),
+        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -168,19 +192,19 @@ SIMPLE_JWT = {
     'TOKEN_TYPE_CLAIM': 'token_type',
 }
 
-# Channels configuration
+# Channels configuration - Updated for Railway Redis
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],  # Redis DB 0 for channels
+            "hosts": [config('REDIS_URL', default='redis://127.0.0.1:6379/0')],
         },
     },
 }
 
-# Celery Configuration
-CELERY_BROKER_URL = 'redis://localhost:6379/1'  # Different DB from channels
-CELERY_RESULT_BACKEND = 'redis://localhost:6379/1'
+# Celery Configuration - Updated for Railway Redis
+CELERY_BROKER_URL = config('REDIS_URL', default='redis://localhost:6379/1')
+CELERY_RESULT_BACKEND = config('REDIS_URL', default='redis://localhost:6379/1')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
