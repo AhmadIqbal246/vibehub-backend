@@ -1,28 +1,26 @@
-# Use official Python image
 FROM python:3.11-slim
 
-# Set working directory inside container
+# Set working directory
 WORKDIR /app
 
-# Install system dependencies (for psycopg2, Pillow, etc.)
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy backend requirements
+# Copy requirements first (better for caching)
 COPY backend/requirements.txt /app/
-# Copy project files
-COPY . .
+
 # Install Python dependencies
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-# Copy all project files
+# Copy project files
 COPY . /app/
 
-# Expose the port Railway will use
+# Expose port
 EXPOSE 8000
 
-# Default command to run your app (ASGI with Daphne)
+# Run Daphne server
 CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "backend.asgi:application"]
