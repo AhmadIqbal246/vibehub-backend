@@ -12,7 +12,8 @@ RUN apt-get update && apt-get install -y \
 
 # Copy backend requirements
 COPY backend/requirements.txt /app/
-
+# Copy project files
+COPY . .
 # Install Python dependencies
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
