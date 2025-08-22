@@ -7,10 +7,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Configure decouple to handle missing .env file gracefully
 env_path = BASE_DIR / '.env'
-try:
+if os.path.exists(env_path):
     config = Config(RepositoryEnv(env_path))
-except FileNotFoundError:
-    config = Config()  # Use environment variables
+else:
+    from decouple import config  # Use environment variables directly
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY')
